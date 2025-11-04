@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Strategy Screener</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            background-color: #ffffff;
+            max-width: 900px;
+            margin: auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            background-color: #f6f8fa;
+            border-bottom: 1px solid #d1d5da;
+            padding: 0.5rem;
+        }
+        .tab-button {
+            padding: 12px 18px;
+            cursor: pointer;
+            border: none;
+            background-color: transparent;
+            font-size: 0.9rem; /* Adjusted for more tabs */
+            font-weight: 600;
+            color: #586069;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-button.active { color: #0366d6; border-bottom-color: #0366d6; }
+        .tab-button:hover { color: #0366d6; }
+        .content { padding: 2rem; }
+        
+        /* NEW STYLES for the single-stock tool input */
+        #tool-input-area {
+            display: none; /* Hidden by default */
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+        #stock-ticker-input {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+        }
+        #get-details-btn {
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            background-color: #28a745;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        #get-details-btn:hover { background-color: #218838; }
+
+        #results-container h2 { font-size: 1.5rem; color: #0d1117; margin-bottom: 1.5rem; }
+        .results-list { list-style-type: none; padding: 0; margin: 0; text-align: left; border: 1px solid #e1e4e8; border-radius: 8px; min-height: 100px; }
+        .results-list li { padding: 12px 18px; border-bottom: 1px solid #e1e4e8; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.95rem; }
+        .results-list li:last-child { border-bottom: none; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 40px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            {% for key, name in features.items() %}
+                <button class="tab-button" data-feature-key="{{ key }}">{{ name }}</button>
+            {% endfor %}
+        </div>
+        <div class="content">
+            <div id="tool-input-area">
+                <input type="text" id="stock-ticker-input" placeholder="Enter Ticker (e.g., RELIANCE.NS)">
+                <button id="get-details-btn">Get Details</button>
+            </div>
+            <div id="results-container">
+                <h2>Select a feature to begin</h2>
+                <ul class="results-list"><li>Results will appear here...</li></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tabs = document.querySelectorAll('.tab-button');
+        const resultsContainer = document.getElementById('results-container');
+        const toolInputArea = document.getElementById('tool-input-area');
+        const tickerInput = document.getElementById('stock-ticker-input');
+        const getDetailsBtn = document.getElementById('get-details-btn');
+        const features = {{ features|tojson }};
+
+        // Define which features are single-stock tools
+        const singleStockTools = ['share_holding_pattern', 'peers_comparison'];
+
+        function displayResults(title, data) {
+            let resultsHtml = `<h2>${title}</h2>`;
+            resultsHtml += '<ul class="results-list">';
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(item => {
+                    resultsHtml += `<li>${item}</li>`;
+                });
+            } else {
+                resultsHtml += '<li>No results found.</li>';
+            }
+            resultsHtml += '</ul>';
+            resultsContainer.innerHTML = resultsHtml;
+        }
+
+        function showLoader(title) {
+            resultsContainer.innerHTML = `<h2>${title}</h2><div class="loader"></div>`;
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const featureKey = tab.dataset.featureKey;
+                
+                if (singleStockTools.includes(featureKey)) {
+                    // This is a single-stock tool
+                    toolInputArea.style.display = 'flex';
+                    const featureName = features[featureKey];
+                    resultsContainer.innerHTML = `<h2>${featureName}</h2><ul class="results-list"><li>Enter a stock ticker above and click 'Get Details'.</li></ul>`;
+                } else {
+                    // This is a screener
+                    toolInputArea.style.display = 'none';
+                    const featureName = features[featureKey];
+                    showLoader(`Running: ${featureName}...`);
+                    
+                    fetch(`/run_screener/${featureKey}`)
+                        .then(response => response.json())
+                        .then(data => displayResults(`Results for: ${featureName}`, data))
+                        .catch(error => console.error('Error:', error));
+                }
+            });
+        });
+
+        getDetailsBtn.addEventListener('click', () => {
+            const activeTab = document.querySelector('.tab-button.active');
+            const ticker = tickerInput.value.toUpperCase();
+
+            if (!activeTab || !ticker) {
+                alert('Please select a tool and enter a ticker.');
+                return;
+            }
+            
+            const featureKey = activeTab.dataset.featureKey;
+            const featureName = features[featureKey];
+            showLoader(`Fetching ${featureName} for ${ticker}...`);
+
+            fetch(`/get_details/${featureKey}?ticker=${ticker}`)
+                .then(response => response.json())
+                .then(data => displayResults(`Results for: ${featureName} (${ticker})`, data))
+                .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
