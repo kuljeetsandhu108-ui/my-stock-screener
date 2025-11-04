@@ -42,7 +42,8 @@
         .chart-label span { font-size: 0.8rem; font-weight: 400; display: block; color: #586069; }
         .metric-card { text-align: center; }
         .metric-card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.5rem; }
-        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 2rem auto; }
+        .loader-container { text-align: center; padding: 4rem; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
         .error-message { text-align: center; color: #721c24; padding: 2rem; font-style: italic; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -50,124 +51,112 @@
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <a href="/" class="back-link">← Back to Platform Home</a>
-        
-        <div class="stock-header" id="stock-header"><div class="loader"></div></div>
-
-        <div class="dashboard-grid">
-            <div class="card grid-col-span-2 profile-info" id="profile-card"><h2>Company Profile</h2><div class="loader"></div></div>
-            <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2><div class="loader"></div></div>
-            <div class="card grid-col-span-3" id="peers-card"><h2>Peers Comparison</h2><div class="loader"></div></div>
-            <div class="card grid-col-span-3" id="shareholding-card"><h2>Top Institutional Holders</h2><div class="loader"></div></div>
-            <div class="card grid-col-span-3">
-                <h2>Fundamental Checklist</h2>
-                <div id="analysis-checklist"><div class="loader"></div></div>
-            </div>
+    <div class="main-container" id="main-content">
+        <div class="loader-container">
+            <h2>Fetching Full Analysis for {{ ticker }}...</h2>
+            <div class="loader"></div>
         </div>
     </div>
 
     <script>
         const ticker = "{{ ticker }}";
+        const features = {{ features|tojson }};
         const mainContent = document.getElementById('main-content');
         const formatNum = (num, decimals = 2) => (num !== null && num !== undefined && !isNaN(num)) ? Number(num).toFixed(decimals) : 'N/A';
 
         document.addEventListener('DOMContentLoaded', () => {
-            
-            // --- Fetch 1: Profile and Header ---
-            fetch(`/api/stock_profile/${ticker}`)
+            fetch(`/api/stock_analysis/${ticker}`)
                 .then(response => response.json())
-                .then(profile => {
-                    if (profile.error) { throw new Error(profile.error); }
+                .then(data => {
+                    if (data.error) {
+                        mainContent.innerHTML = `<h1>Error</h1><p>${data.error}</p><a href="/" class="back-link">← Go Back</a>`;
+                        return;
+                    }
+
+                    const profile = data.profile;
+                    const analysis = data.analysis;
                     const changeClass = profile.changes > 0 ? 'price-change-positive' : 'price-change-negative';
                     const changePct = profile.price && (profile.price - profile.changes) !== 0 ? (profile.changes / (profile.price - profile.changes) * 100) : 0;
 
-                    document.getElementById('stock-header').innerHTML = `
-                        <h1>${profile.companyName} <span class="symbol">(${profile.symbol})</span></h1>
-                        <div class="price-info">
-                            <span>${formatNum(profile.price)} ${profile.currency}</span>
-                            <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum(changePct)}%)</span>
-                        </div>`;
+                    mainContent.innerHTML = `
+                        <a href="/" class="back-link">← Back to Platform Home</a>
+                        <div class="stock-header">
+                            <h1>${profile.companyName} <span class="symbol">(${profile.symbol})</span></h1>
+                            <div class="price-info">
+                                <span>${formatNum(profile.price)} ${profile.currency}</span>
+                                <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum(changePct)}%)</span>
+                            </div>
+                        </div>
+                        <div class="dashboard-grid">
+                            <div class="card grid-col-span-2 profile-info">
+                                <h2>Company Profile</h2>
+                                <p><strong>Sector:</strong> ${profile.sector || 'N/A'}</p>
+                                <p><strong>Industry:</strong> ${profile.industry || 'N/A'}</p>
+                                <p><strong>Market Cap:</strong> ${Number(profile.mktCap).toLocaleString()} ${profile.currency}</p>
+                                <p class="description">${profile.description || 'No description available.'}</p>
+                            </div>
+                            <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2></div>
+                            <div class="card grid-col-span-3" id="peers-card"><h2>Peers Comparison</h2></div>
+                            <div class="card grid-col-span-3" id="shareholding-card"><h2>Top Institutional Holders</h2></div>
+                            <div class="card grid-col-span-1 metric-card" id="magic-formula-card"><h2>Magic Formula</h2></div>
+                            <div class="card grid-col-span-2" id="market-view-card"><h2>Market View Forecast</h2></div>
+                            <div class="card grid-col-span-3">
+                                <h2>12-Point Checklist</h2>
+                                <ul class="checklist" id="analysis-checklist"></ul>
+                            </div>
+                        </div>
+                    `;
                     
-                    document.getElementById('profile-card').innerHTML = `
-                        <h2>Company Profile</h2>
-                        <p><strong>Sector:</strong> ${profile.sector || 'N/A'}</p>
-                        <p><strong>Industry:</strong> ${profile.industry || 'N/A'}</p>
-                        <p><strong>Market Cap:</strong> ${Number(profile.mktCap).toLocaleString()} ${profile.currency}</p>
-                        <p class="description">${profile.description || 'No description available.'}</p>`;
-                })
-                .catch(err => {
-                    document.getElementById('stock-header').innerHTML = `<h1>Error loading profile for ${ticker}</h1>`;
-                    document.getElementById('profile-card').innerHTML = `<div class="error-message">Could not load profile data.</div>`;
-                    console.error(err);
-                });
-
-            // --- Fetch 2: Checklist Data ---
-            fetch(`/api/stock_checklist/${ticker}`)
-                .then(response => response.json())
-                .then(analysis => {
-                    if (Object.keys(analysis).length === 0) { throw new Error('Empty checklist response'); }
-                    let checklistHTML = '<ul class="checklist">';
-                    const simpleChecks = ['benjamin_graham', 'qual_quant_analysis', 'balance_sheet_analysis'];
-                    simpleChecks.forEach(key => {
-                        const item = analysis[key];
-                        if (item) {
-                            let sClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
-                            let sText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
-                            checklistHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${item.details}</div></li>`;
-                        }
-                    });
-                    const mf = analysis.magic_formula;
-                    if(mf) { checklistHTML += `<li class="check-item"><div class="check-item-header"><span>Magic Formula</span></div><div class="check-item-details">ROCE: ${mf.roce}, Earnings Yield: ${mf.ey}</div></li>`; }
-                    checklistHTML += '</ul>';
-                    document.getElementById('analysis-checklist').innerHTML = checklistHTML;
-                })
-                .catch(err => {
-                    document.getElementById('analysis-checklist').innerHTML = `<div class="error-message">Could not load checklist data.</div>`;
-                    console.error(err);
-                });
-
-            // --- Fetch 3: Shareholding Data ---
-            fetch(`/api/stock_shareholding/${ticker}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data || Object.keys(data).length === 0) { throw new Error('Empty shareholding response'); }
-                    if (data.ownership_pct !== undefined) {
-                        const pct = data.ownership_pct;
-                        document.getElementById('inst-buying-card').innerHTML = `<h2>Institutional Ownership</h2>
-                            <div class="chart-container">
-                                <canvas id="ownershipChart"></canvas>
-                                <div class="chart-label">${formatNum(pct, 1)}%<span>Owned</span></div>
-                            </div>`;
+                    // --- Populate Rich Components with Bulletproof Error Handling ---
+                    try {
+                        const pct = analysis.institutional_buying.ownership_pct;
+                        document.getElementById('inst-buying-card').innerHTML += `<div class="chart-container"><canvas id="ownershipChart"></canvas><div class="chart-label">${formatNum(pct, 1)}%<span>Owned</span></div></div>`;
                         new Chart(document.getElementById('ownershipChart'), { type: 'doughnut', data: { datasets: [{ data: [pct, 100 - pct], backgroundColor: ['#0366d6', '#e1e4e8'], borderWidth: 0 }] }, options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
-                    }
-                    if (data.top_holders) {
-                        let tableHTML = '<h2>Top Institutional Holders</h2><table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
-                        data.top_holders.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
-                        document.getElementById('shareholding-card').innerHTML = tableHTML + '</tbody></table>';
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('inst-buying-card').innerHTML = `<h2>Institutional Ownership</h2><div class="error-message">Could not load data.</div>`;
-                    document.getElementById('shareholding-card').innerHTML = `<h2>Top Institutional Holders</h2><div class="error-message">Could not load data.</div>`;
-                    console.error(err);
-                });
+                    } catch { document.getElementById('inst-buying-card').innerHTML += `<div class="error-message">Could not load ownership data.</div>`; }
+                    
+                    try {
+                        let tableHTML = '<table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
+                        analysis.peers_comparison.forEach(p => {
+                            tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
+                        });
+                        document.getElementById('peers-card').innerHTML += tableHTML + '</tbody></table>';
+                    } catch { document.getElementById('peers-card').innerHTML += `<div class="error-message">Could not load peers data.</div>`; }
 
-            // --- Fetch 4: Peers Data ---
-            fetch(`/api/stock_peers/${ticker}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data || data.length === 0) { throw new Error('Empty peers response'); }
-                    let tableHTML = '<h2>Peers Comparison</h2><table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
-                    data.forEach(p => {
-                        tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
-                    });
-                    document.getElementById('peers-card').innerHTML = tableHTML + '</tbody></table>';
+                    try {
+                        let tableHTML = '<table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
+                        analysis.share_holding_pattern.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
+                        document.getElementById('shareholding-card').innerHTML += tableHTML + '</tbody></table>';
+                    } catch { document.getElementById('shareholding-card').innerHTML += `<div class="error-message">Could not load shareholding data.</div>`; }
+                    
+                    try { document.getElementById('magic-formula-card').innerHTML += `<p class="value">${analysis.magic_formula.roce}<span>ROCE</span></p><p class="value">${analysis.magic_formula.ey}<span>Earnings Yield</span></p>`; }
+                    catch { document.getElementById('magic-formula-card').innerHTML += `<div class="error-message">Data unavailable.</div>`; }
+                    
+                    try {
+                        let listHTML = '<ul class="checklist">';
+                        analysis.market_view_forecast.forEach(line => { listHTML += `<li class="check-item">${line}</li>`; });
+                        document.getElementById('market-view-card').innerHTML += listHTML + '</ul>';
+                    } catch { document.getElementById('market-view-card').innerHTML += `<div class="error-message">Could not load market data.</div>`; }
+                    
+                    // --- Populate Full 12-Point Checklist ---
+                    try {
+                        const checklist = document.getElementById('analysis-checklist');
+                        let checklistHTML = '';
+                        for (const key in features) {
+                            const item = analysis[key];
+                            let sClass = 'status-na';
+                            let sText = 'N/A';
+                            let details = 'Data unavailable or not applicable.';
+                            if (item && item.pass !== undefined) {
+                                sClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
+                                sText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
+                                details = item.details;
+                            }
+                            checklistHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${details}</div></li>`;
+                        }
+                        checklist.innerHTML = checklistHTML;
+                    } catch { document.getElementById('analysis-checklist').innerHTML = `<div class="error-message">Could not load checklist data.</div>`; }
                 })
-                .catch(err => {
-                    document.getElementById('peers-card').innerHTML = `<h2>Peers Comparison</h2><div class="error-message">Could not load data.</div>`;
-                    console.error(err);
-                });
+                .catch(error => { mainContent.innerHTML = `<h1>Error</h1><p>Could not load analysis. Please try again.</p><a href="/" class="back-link">← Go Back</a>`; console.error('Error fetching stock analysis:', error); });
         });
     </script>
 </body>
