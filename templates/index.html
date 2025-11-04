@@ -5,70 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Investment Strategy Screener</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5;
-            color: #1c1e21;
-            margin: 0;
-            padding: 2rem;
-        }
-        .container {
-            background-color: #ffffff;
-            max-width: 900px;
-            margin: auto;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .tabs {
-            display: flex;
-            flex-wrap: wrap;
-            background-color: #f6f8fa;
-            border-bottom: 1px solid #d1d5da;
-            padding: 0.5rem;
-        }
-        .tab-button {
-            padding: 12px 18px;
-            cursor: pointer;
-            border: none;
-            background-color: transparent;
-            font-size: 0.9rem; /* Adjusted for more tabs */
-            font-weight: 600;
-            color: #586069;
-            border-bottom: 3px solid transparent;
-            transition: all 0.2s ease-in-out;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #1c1e21; margin: 0; padding: 2rem; }
+        .container { background-color: #ffffff; max-width: 900px; margin: auto; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .tabs { display: flex; flex-wrap: wrap; background-color: #f6f8fa; border-bottom: 1px solid #d1d5da; padding: 0.5rem; }
+        .tab-button { padding: 12px 18px; cursor: pointer; border: none; background-color: transparent; font-size: 0.9rem; font-weight: 600; color: #586069; border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; }
         .tab-button.active { color: #0366d6; border-bottom-color: #0366d6; }
         .tab-button:hover { color: #0366d6; }
         .content { padding: 2rem; }
+        #tool-input-area { display: none; margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+        #stock-ticker-input { flex-grow: 1; padding: 10px; font-size: 1rem; border: 1px solid #d1d5da; border-radius: 6px; }
+        #get-details-btn { padding: 10px 20px; font-size: 1rem; font-weight: 600; color: #fff; background-color: #28a745; border: none; border-radius: 6px; cursor: pointer; }
+        #get-details-btn:hover { background-color: #218838; }
         
-        /* NEW STYLES for the single-stock tool input */
-        #tool-input-area {
-            display: none; /* Hidden by default */
-            margin-bottom: 1.5rem;
+        /* NEW: Styles for the header area with the reset button */
+        .results-header {
             display: flex;
-            gap: 1rem;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
         }
-        #stock-ticker-input {
-            flex-grow: 1;
-            padding: 10px;
-            font-size: 1rem;
-            border: 1px solid #d1d5da;
-            border-radius: 6px;
-        }
-        #get-details-btn {
-            padding: 10px 20px;
-            font-size: 1rem;
+        .results-header h2 { font-size: 1.5rem; color: #0d1117; margin: 0; }
+        #reset-button {
+            display: none; /* Hidden by default */
+            padding: 8px 16px;
+            font-size: 0.9rem;
             font-weight: 600;
-            color: #fff;
-            background-color: #28a745;
-            border: none;
+            color: #0366d6;
+            background-color: #f1f8ff;
+            border: 1px solid #0366d6;
             border-radius: 6px;
             cursor: pointer;
+            transition: background-color 0.2s;
         }
-        #get-details-btn:hover { background-color: #218838; }
+        #reset-button:hover { background-color: #ddeeff; }
 
-        #results-container h2 { font-size: 1.5rem; color: #0d1117; margin-bottom: 1.5rem; }
         .results-list { list-style-type: none; padding: 0; margin: 0; text-align: left; border: 1px solid #e1e4e8; border-radius: 8px; min-height: 100px; }
         .results-list li { padding: 12px 18px; border-bottom: 1px solid #e1e4e8; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.95rem; }
         .results-list li:last-child { border-bottom: none; }
@@ -89,7 +59,10 @@
                 <button id="get-details-btn">Get Details</button>
             </div>
             <div id="results-container">
-                <h2>Select a feature to begin</h2>
+                <div class="results-header">
+                    <h2>Select a feature to begin</h2>
+                    <button id="reset-button">Force Refresh</button>
+                </div>
                 <ul class="results-list"><li>Results will appear here...</li></ul>
             </div>
         </div>
@@ -103,25 +76,59 @@
         const getDetailsBtn = document.getElementById('get-details-btn');
         const features = {{ features|tojson }};
 
-        // Define which features are single-stock tools
+        // This object will act as our frontend cache
+        const frontendCache = {};
+
         const singleStockTools = ['share_holding_pattern', 'peers_comparison'];
 
-        function displayResults(title, data) {
-            let resultsHtml = `<h2>${title}</h2>`;
+        function displayResults(title, data, featureKey) {
+            let resultsHtml = `<div class="results-header"><h2>${title}</h2><button id="reset-button">Force Refresh</button></div>`;
             resultsHtml += '<ul class="results-list">';
             if (data.results && data.results.length > 0) {
-                data.results.forEach(item => {
-                    resultsHtml += `<li>${item}</li>`;
-                });
+                data.results.forEach(item => { resultsHtml += `<li>${item}</li>`; });
             } else {
                 resultsHtml += '<li>No results found.</li>';
             }
             resultsHtml += '</ul>';
             resultsContainer.innerHTML = resultsHtml;
+            
+            const newResetButton = document.getElementById('reset-button');
+            const isScreener = !singleStockTools.includes(featureKey);
+            
+            if (isScreener) {
+                newResetButton.style.display = 'inline-block';
+                newResetButton.addEventListener('click', () => runScreener(featureKey, true));
+            }
         }
 
         function showLoader(title) {
-            resultsContainer.innerHTML = `<h2>${title}</h2><div class="loader"></div>`;
+            resultsContainer.innerHTML = `<div class="results-header"><h2>${title}</h2><button id="reset-button" style="display:none;">Force Refresh</button></div><div class="loader"></div>`;
+        }
+        
+        function runScreener(featureKey, forceRefresh = false) {
+            const featureName = features[featureKey];
+
+            // If not forcing a refresh, check the frontend cache first
+            if (!forceRefresh && frontendCache[featureKey]) {
+                console.log(`Loading ${featureKey} from frontend cache.`);
+                displayResults(`Results for: ${featureName}`, frontendCache[featureKey], featureKey);
+                return;
+            }
+
+            showLoader(`Running: ${featureName}...`);
+            
+            let url = `/run_screener/${featureKey}`;
+            if (forceRefresh) {
+                url += '?force_refresh=true';
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    frontendCache[featureKey] = data; // Save to frontend cache
+                    displayResults(`Results for: ${featureName}`, data, featureKey);
+                })
+                .catch(error => console.error('Error:', error));
         }
 
         tabs.forEach(tab => {
@@ -132,20 +139,12 @@
                 const featureKey = tab.dataset.featureKey;
                 
                 if (singleStockTools.includes(featureKey)) {
-                    // This is a single-stock tool
                     toolInputArea.style.display = 'flex';
                     const featureName = features[featureKey];
-                    resultsContainer.innerHTML = `<h2>${featureName}</h2><ul class="results-list"><li>Enter a stock ticker above and click 'Get Details'.</li></ul>`;
+                    resultsContainer.innerHTML = `<div class="results-header"><h2>${featureName}</h2><button id="reset-button" style="display:none;">Force Refresh</button></div><ul class="results-list"><li>Enter a stock ticker above and click 'Get Details'.</li></ul>`;
                 } else {
-                    // This is a screener
                     toolInputArea.style.display = 'none';
-                    const featureName = features[featureKey];
-                    showLoader(`Running: ${featureName}...`);
-                    
-                    fetch(`/run_screener/${featureKey}`)
-                        .then(response => response.json())
-                        .then(data => displayResults(`Results for: ${featureName}`, data))
-                        .catch(error => console.error('Error:', error));
+                    runScreener(featureKey, false);
                 }
             });
         });
@@ -153,11 +152,7 @@
         getDetailsBtn.addEventListener('click', () => {
             const activeTab = document.querySelector('.tab-button.active');
             const ticker = tickerInput.value.toUpperCase();
-
-            if (!activeTab || !ticker) {
-                alert('Please select a tool and enter a ticker.');
-                return;
-            }
+            if (!activeTab || !ticker) { alert('Please select a tool and enter a ticker.'); return; }
             
             const featureKey = activeTab.dataset.featureKey;
             const featureName = features[featureKey];
@@ -165,9 +160,10 @@
 
             fetch(`/get_details/${featureKey}?ticker=${ticker}`)
                 .then(response => response.json())
-                .then(data => displayResults(`Results for: ${featureName} (${ticker})`, data))
+                .then(data => displayResults(`Results for: ${featureName} (${ticker})`, data, featureKey))
                 .catch(error => console.error('Error:', error));
         });
+        
     </script>
 </body>
 </html>
