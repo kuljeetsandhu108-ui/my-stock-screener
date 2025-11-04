@@ -246,10 +246,10 @@ def run_market_view_forecast():
         return [f"Index: NIFTY 50", f"Current Price: {current_price:,.2f}", f"50-Day Avg: {sma_50:,.2f}", f"200-Day Avg: {sma_200:,.2f}", f"Verdict: {verdict}"]
     except Exception as e: return [f"An error occurred: {e}"]
 
-# --- PART 2: THE ULTIMATE 12-POINT ANALYSIS ENGINE ---
+# --- PART 2: THE ULTIMATE, OPTIMIZED 12-POINT ANALYSIS ENGINE ---
 
 def get_full_stock_analysis(ticker):
-    print(f"Running ULTIMATE 12-point analysis for {ticker}...")
+    print(f"Running OPTIMIZED 12-point analysis for {ticker}...")
     try:
         profile = requests.get(f"{BASE_URL}/profile/{ticker}?apikey={API_KEY}").json()[0]
         ratios_ttm = requests.get(f"{BASE_URL}/ratios-ttm/{ticker}?apikey={API_KEY}").json()[0]
@@ -259,23 +259,26 @@ def get_full_stock_analysis(ticker):
         holders = requests.get(f"{BASE_URL}/institutional-holder/{ticker}?apikey={API_KEY}").json()
         historical_data_raw = requests.get(f"{BASE_URL}/historical-price-full/{ticker}?timeseries=65&apikey={API_KEY}").json().get('historical', [])
         if historical_data_raw: historical_data_raw.reverse()
+        
         industry, sector = profile.get('industry'), profile.get('sector')
-        peers_list = []
+        peers_data = []
         if industry:
-            peers_params = {'industry': industry, 'sector': sector, 'exchange': 'NSE,BSE', 'limit': 10, 'apikey': API_KEY}
+            peers_params = {'industry': industry, 'sector': sector, 'exchange': 'NSE,BSE', 'limit': 5, 'apikey': API_KEY}
             peers_response = requests.get(f"{BASE_URL}/stock-screener", params=peers_params).json()
-            peers_list = [p for p in peers_response if p['symbol'] != ticker.upper()]
+            # OPTIMIZATION: We add the main stock and then the peers with data we ALREADY have
+            peers_data.append({'symbol': ticker, **ratios_ttm})
+            for peer in peers_response:
+                if peer['symbol'] != ticker.upper():
+                    peers_data.append(peer)
+
     except Exception: return {'error': f"Could not fetch data for {ticker}. It may be invalid or not supported."}
 
     analysis = {}
-    
-    # Simple Checks
     pe, pb = ratios_ttm.get('priceEarningsRatioTTM'), ratios_ttm.get('priceToBookRatioTTM')
     roe, gpm, de = ratios_ttm.get('returnOnEquityTTM', 0), ratios_ttm.get('grossProfitMarginTTM', 0), ratios_ttm.get('debtEquityRatioTTM', 999)
     analysis['benjamin_graham'] = {'pass': pe is not None and pb is not None and pe < 15 and pb < 1.5, 'details': f"P/E: {pe:.2f} (Req:<15), P/B: {pb:.2f} (Req:<1.5)"}
     analysis['qual_quant_analysis'] = {'pass': roe > 0.15 and gpm > 0.30 and de < 1.0, 'details': f"ROE>15%: {roe:.2%}, Margin>30%: {gpm:.2%}, D/E<1: {de:.2f}"}
 
-    # Complex Checks
     try: analysis['piotroski_scan'] = {'pass': sum([annual_ratios[0].get(k, 0) > annual_ratios[1].get(k, 0) for k in ['returnOnAssets', 'currentRatio']]) + (annual_ratios[0].get('returnOnAssets',0)>0) >= 2, 'details': f"Score (simp.): {sum([annual_ratios[0].get(k, 0) > annual_ratios[1].get(k, 0) for k in ['returnOnAssets', 'currentRatio']]) + (annual_ratios[0].get('returnOnAssets',0)>0)}/3"}
     except: analysis['piotroski_scan'] = {'pass': None, 'details': 'Incomplete data.'}
     try: analysis['canslim'] = {'pass': (((quarterly_income[0].get('eps', 0) - quarterly_income[4].get('eps', 0)) / quarterly_income[4].get('eps', 0)) > 0.25 if quarterly_income[4].get('eps',0)>0 else False) and (profile.get('price', 0) > (float(profile.get('range', '0-0').split('-')[1]) * 0.75)), 'details': 'Checks Qtrly EPS Growth > 25% & Price near 52-wk high.'}
@@ -286,8 +289,7 @@ def get_full_stock_analysis(ticker):
     except: analysis['coffee_can'] = {'pass': None, 'details': 'Incomplete data.'}
     try: analysis['balance_sheet_analysis'] = {'pass': ratios_ttm.get('currentRatioTTM', 0) > 1.5 and de < 1.0 and sum(1 for j in range(1, len(annual_metrics)) if annual_metrics[j].get('bookValuePerShare', 0) > annual_metrics[j-1].get('bookValuePerShare', 0)) >= 3, 'details': 'Checks for strong ratios and growing book value.'}
     except: analysis['balance_sheet_analysis'] = {'pass': None, 'details': 'Incomplete data.'}
-
-    # Data-Rich Components
+    
     analysis['market_view_forecast'] = run_market_view_forecast()
     analysis['magic_formula'] = {'roce': f"{ratios_ttm.get('returnOnCapitalEmployedTTM'):.2%}" if ratios_ttm.get('returnOnCapitalEmployedTTM') is not None else "N/A", 'ey': f"{ratios_ttm.get('earningsYieldTTM'):.2%}" if ratios_ttm.get('earningsYieldTTM') is not None else "N/A"}
     if holders:
@@ -296,12 +298,7 @@ def get_full_stock_analysis(ticker):
         analysis['share_holding_pattern'] = [{'holder': h['holder'], 'shares': f"{h.get('shares', 0):,}", 'date': h['date']} for h in sorted(holders, key=lambda x: x.get('shares', 0), reverse=True)[:10]]
         analysis['institutional_buying'] = {'ownership_pct': (total_inst_shares / total_shares * 100) if total_shares > 0 else 0}
     
-    peers_data = [{'symbol': ticker, **(requests.get(f"{BASE_URL}/ratios-ttm/{ticker}?apikey={API_KEY}").json()[0])}]
-    for peer in peers_list[:4]:
-        try: peers_data.append({'symbol': peer['symbol'], **(requests.get(f"{BASE_URL}/ratios-ttm/{peer['symbol']}?apikey={API_KEY}").json()[0])})
-        except: continue
     analysis['peers_comparison'] = peers_data
-
     return {'profile': profile, 'analysis': analysis}
 
 # --- API Routes ---

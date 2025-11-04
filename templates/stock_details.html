@@ -51,6 +51,10 @@
         .metric-card { text-align: center; }
         .metric-card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.5rem; }
 
+        .loader-container { text-align: center; padding: 4rem; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         @media (max-width: 1024px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -64,17 +68,15 @@
 </head>
 <body>
     <div class="main-container" id="main-content">
-        <div style="text-align: center; padding: 4rem;">
+        <div class="loader-container">
             <h2>Fetching Full Analysis for {{ ticker }}...</h2>
-            <div style="border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+            <div class="loader"></div>
         </div>
     </div>
 
     <script>
         const ticker = "{{ ticker }}";
         const mainContent = document.getElementById('main-content');
-
-        // Helper function to format numbers
         const formatNum = (num, decimals = 2) => num !== null && num !== undefined ? Number(num).toFixed(decimals) : 'N/A';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -89,18 +91,17 @@
                     const profile = data.profile;
                     const analysis = data.analysis;
                     const changeClass = profile.changes > 0 ? 'price-change-positive' : 'price-change-negative';
+                    const changePct = profile.price && (profile.price - profile.changes) !== 0 ? (profile.changes / (profile.price - profile.changes) * 100) : 0;
 
-                    // --- Build HTML Structure ---
                     mainContent.innerHTML = `
                         <a href="/" class="back-link">← Back to Platform Home</a>
                         <div class="stock-header">
                             <h1>${profile.companyName} <span class="symbol">(${profile.symbol})</span></h1>
                             <div class="price-info">
                                 <span>${formatNum(profile.price)} ${profile.currency}</span>
-                                <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum((profile.changes / (profile.price - profile.changes)) * 100)}%)</span>
+                                <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum(changePct)}%)</span>
                             </div>
                         </div>
-
                         <div class="dashboard-grid">
                             <div class="card grid-col-span-2 profile-info">
                                 <h2>Company Profile</h2>
@@ -109,14 +110,11 @@
                                 <p><strong>Market Cap:</strong> ${Number(profile.mktCap).toLocaleString()} ${profile.currency}</p>
                                 <p class="description">${profile.description || 'No description available.'}</p>
                             </div>
-                            
-                            <div class="card grid-col-span-1" id="inst-buying-card"></div>
-                            <div class="card grid-col-span-3" id="peers-card"></div>
-                            <div class="card grid-col-span-3" id="shareholding-card"></div>
-
-                            <div class="card grid-col-span-1 metric-card" id="magic-formula-card"></div>
-                            <div class="card grid-col-span-2" id="market-view-card"></div>
-
+                            <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2></div>
+                            <div class="card grid-col-span-3" id="peers-card"><h2>Peers Comparison</h2></div>
+                            <div class="card grid-col-span-3" id="shareholding-card"><h2>Top Institutional Holders</h2></div>
+                            <div class="card grid-col-span-1 metric-card" id="magic-formula-card"><h2>Magic Formula</h2></div>
+                            <div class="card grid-col-span-2" id="market-view-card"><h2>Market View Forecast</h2></div>
                             <div class="card grid-col-span-3">
                                 <h2>Fundamental Checklist</h2>
                                 <ul class="checklist" id="analysis-checklist"></ul>
@@ -124,90 +122,56 @@
                         </div>
                     `;
 
-                    // --- Populate Rich Components ---
-
-                    // 1. Institutional Buying Chart
+                    // Populate Institutional Buying Chart
                     if (analysis.institutional_buying) {
                         const pct = analysis.institutional_buying.ownership_pct;
-                        document.getElementById('inst-buying-card').innerHTML = `
-                            <h2>Institutional Ownership</h2>
+                        document.getElementById('inst-buying-card').innerHTML += `
                             <div class="chart-container">
                                 <canvas id="ownershipChart"></canvas>
                                 <div class="chart-label">${formatNum(pct, 1)}%<span>Owned</span></div>
-                            </div>
-                        `;
-                        new Chart(document.getElementById('ownershipChart'), {
-                            type: 'doughnut',
-                            data: {
-                                datasets: [{ data: [pct, 100 - pct], backgroundColor: ['#0366d6', '#e1e4e8'], borderWidth: 0 }]
-                            },
-                            options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
-                        });
+                            </div>`;
+                        new Chart(document.getElementById('ownershipChart'), { type: 'doughnut', data: { datasets: [{ data: [pct, 100 - pct], backgroundColor: ['#0366d6', '#e1e4e8'], borderWidth: 0 }] }, options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
                     }
 
-                    // 2. Peers Comparison Table
+                    // Populate Peers Comparison Table
                     if (analysis.peers_comparison && analysis.peers_comparison.length > 0) {
-                        let tableHTML = '<h2>Peers Comparison</h2><table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
-                        analysis.peers_comparison.forEach(peer => {
-                            const isMain = peer.symbol === ticker.toUpperCase();
-                            tableHTML += `
-                                <tr class="${isMain ? 'main-stock-row' : ''}">
-                                    <td>${peer.symbol}</td>
-                                    <td>${formatNum(peer.priceEarningsRatioTTM)}</td>
-                                    <td>${formatNum(peer.priceToBookRatioTTM)}</td>
-                                    <td>${formatNum(peer.returnOnEquityTTM * 100)}%</td>
-                                    <td>${formatNum(peer.debtEquityRatioTTM)}</td>
-                                </tr>`;
+                        let tableHTML = '<table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
+                        analysis.peers_comparison.forEach(p => {
+                            tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
                         });
-                        tableHTML += '</tbody></table>';
-                        document.getElementById('peers-card').innerHTML = tableHTML;
+                        document.getElementById('peers-card').innerHTML += tableHTML + '</tbody></table>';
                     }
 
-                    // 3. Shareholding Table
+                    // Populate Shareholding Table
                     if (analysis.share_holding_pattern) {
-                        let tableHTML = '<h2>Top Institutional Holders</h2><table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
-                        analysis.share_holding_pattern.forEach(h => {
-                            tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`;
-                        });
-                        tableHTML += '</tbody></table>';
-                        document.getElementById('shareholding-card').innerHTML = tableHTML;
+                        let tableHTML = '<table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
+                        analysis.share_holding_pattern.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
+                        document.getElementById('shareholding-card').innerHTML += tableHTML + '</tbody></table>';
                     }
                     
-                    // 4. Magic Formula Card
-                    if (analysis.magic_formula) {
-                        document.getElementById('magic-formula-card').innerHTML = `<h2>Magic Formula</h2><p class="value">${analysis.magic_formula.roce}<span>ROCE</span></p><p class="value">${analysis.magic_formula.ey}<span>Earnings Yield</span></p>`;
-                    }
-                    
-                    // 5. Market View Card
+                    // Populate Magic Formula Card
+                    if (analysis.magic_formula) { document.getElementById('magic-formula-card').innerHTML += `<p class="value">${analysis.magic_formula.roce}<span>ROCE</span></p><p class="value">${analysis.magic_formula.ey}<span>Earnings Yield</span></p>`; }
+
+                    // Populate Market View Card
                     if (analysis.market_view_forecast) {
-                        let listHTML = '<h2>Market View Forecast</h2><ul class="checklist">';
-                        analysis.market_view_forecast.forEach(line => {
-                            listHTML += `<li class="check-item">${line}</li>`;
-                        });
-                        listHTML += '</ul>';
-                        document.getElementById('market-view-card').innerHTML = listHTML;
+                        let listHTML = '<ul class="checklist">';
+                        analysis.market_view_forecast.forEach(line => { listHTML += `<li class="check-item">${line}</li>`; });
+                        document.getElementById('market-view-card').innerHTML += listHTML + '</ul>';
                     }
 
-                    // 6. Populate Simple Checklist
+                    // Populate Simple Checklist
                     const checklist = document.getElementById('analysis-checklist');
                     const simpleChecks = ['benjamin_graham', 'piotroski_scan', 'canslim', 'darvas_scan', 'coffee_can', 'qual_quant_analysis', 'balance_sheet_analysis'];
                     simpleChecks.forEach(key => {
                         const item = analysis[key];
                         if (item) {
-                            let statusClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
-                            let statusText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
-                            checklist.innerHTML += `
-                                <li class="check-item">
-                                    <div class="check-item-header"><span>${features[key]}</span><span class="status ${statusClass}">${statusText}</span></div>
-                                    <div class="check-item-details">${item.details}</div>
-                                </li>`;
+                            let sClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
+                            let sText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
+                            checklist.innerHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${item.details}</div></li>`;
                         }
                     });
                 })
-                .catch(error => {
-                    mainContent.innerHTML = `<h1>Error</h1><p>Could not load analysis. Please try again.</p><a href="/" class="back-link">← Go Back</a>`;
-                    console.error('Error fetching stock analysis:', error);
-                });
+                .catch(error => { mainContent.innerHTML = `<h1>Error</h1><p>Could not load analysis. Please try again.</p><a href="/" class="back-link">← Go Back</a>`; console.error('Error:', error); });
         });
     </script>
 </body>
