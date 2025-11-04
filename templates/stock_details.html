@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Analysis - {{ ticker }}</title>
-    <!-- We are adding a Chart library for the animated doughnut chart -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #1c1e21; margin: 0; padding: 1rem 2rem; }
         .main-container { max-width: 1200px; margin: auto; }
         .back-link { display: inline-block; margin-bottom: 1rem; color: #0366d6; text-decoration: none; font-weight: 600; }
         .back-link:hover { text-decoration: underline; }
-        
-        .stock-header { background-color: #ffffff; padding: 1.5rem 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 2rem; }
+        .stock-header { background-color: #ffffff; padding: 1.5rem 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 2rem; min-height: 120px; }
         .stock-header h1 { margin: 0; font-size: 2.2rem; display: flex; align-items: center; flex-wrap: wrap; }
         .stock-header .symbol { color: #586069; font-size: 1.5rem; margin-left: 0.75rem; font-weight: 400; }
         .price-info { display: flex; align-items: baseline; gap: 1rem; margin-top: 0.5rem; font-size: 1.8rem; font-weight: 600; }
@@ -20,14 +18,11 @@
         .price-change-negative { color: #dc3545; }
         .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); padding: 1.5rem; }
         .card h2 { margin-top: 0; border-bottom: 1px solid #e1e4e8; padding-bottom: 0.75rem; font-size: 1.2rem; }
-        
         .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto; gap: 2rem; }
         .grid-col-span-1 { grid-column: span 1; }
         .grid-col-span-2 { grid-column: span 2; }
         .grid-col-span-3 { grid-column: span 3; }
-
         .profile-info .description { margin-top: 1rem; font-size: 0.9rem; color: #586069; max-height: 200px; overflow-y: auto; }
-        
         .checklist { list-style: none; padding: 0; margin: 0; }
         .check-item { border-bottom: 1px solid #e1e4e8; padding: 0.75rem 0; }
         .check-item:last-child { border-bottom: none; }
@@ -37,141 +32,133 @@
         .status-pass { background-color: #d4edda; color: #155724; }
         .status-fail { background-color: #f8d7da; color: #721c24; }
         .status-na { background-color: #e2e3e5; color: #383d41; }
-        
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e1e4e8; }
         th { font-weight: 600; color: #586069; }
         tbody tr:last-child td { border-bottom: none; }
         .main-stock-row { background-color: #f1f8ff; font-weight: bold; }
-
         .chart-container { position: relative; height: 180px; width: 180px; margin: 1.5rem auto 0 auto; }
         .chart-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 1.8rem; font-weight: 700; }
         .chart-label span { font-size: 0.8rem; font-weight: 400; display: block; color: #586069; }
-        
         .metric-card { text-align: center; }
         .metric-card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.5rem; }
-
-        .loader-container { text-align: center; padding: 4rem; }
-        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 2rem auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        @media (max-width: 1024px) {
-            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 768px) {
-            body { padding: 1rem; }
-            .dashboard-grid { grid-template-columns: 1fr; }
-            .stock-header h1 { font-size: 1.8rem; }
-            .price-info { font-size: 1.5rem; }
-        }
+        @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { body { padding: 1rem; } .dashboard-grid { grid-template-columns: 1fr; } .stock-header h1 { font-size: 1.8rem; } .price-info { font-size: 1.5rem; } }
     </style>
 </head>
 <body>
-    <div class="main-container" id="main-content">
-        <div class="loader-container">
-            <h2>Fetching Full Analysis for {{ ticker }}...</h2>
+    <div class="main-container">
+        <a href="/" class="back-link">← Back to Platform Home</a>
+        
+        <!-- Header - Populated First -->
+        <div class="stock-header" id="stock-header">
             <div class="loader"></div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <div class="card grid-col-span-2 profile-info" id="profile-card"><h2>Company Profile</h2><div class="loader"></div></div>
+            <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2><div class="loader"></div></div>
+            <div class="card grid-col-span-3" id="peers-card"><h2>Peers Comparison</h2><div class="loader"></div></div>
+            <div class="card grid-col-span-3" id="shareholding-card"><h2>Top Institutional Holders</h2><div class="loader"></div></div>
+            <div class="card grid-col-span-3">
+                <h2>Fundamental Checklist</h2>
+                <div id="analysis-checklist"><div class="loader"></div></div>
+            </div>
         </div>
     </div>
 
     <script>
         const ticker = "{{ ticker }}";
-        const mainContent = document.getElementById('main-content');
         const formatNum = (num, decimals = 2) => num !== null && num !== undefined ? Number(num).toFixed(decimals) : 'N/A';
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetch(`/api/stock_analysis/${ticker}`)
+            
+            // --- Fetch 1: Profile and Header ---
+            fetch(`/api/stock_profile/${ticker}`)
                 .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        mainContent.innerHTML = `<h1>Error</h1><p>${data.error}</p><a href="/" class="back-link">← Go Back</a>`;
-                        return;
-                    }
-
-                    const profile = data.profile;
-                    const analysis = data.analysis;
+                .then(profile => {
+                    if (profile.error) { throw new Error(profile.error); }
                     const changeClass = profile.changes > 0 ? 'price-change-positive' : 'price-change-negative';
                     const changePct = profile.price && (profile.price - profile.changes) !== 0 ? (profile.changes / (profile.price - profile.changes) * 100) : 0;
 
-                    mainContent.innerHTML = `
-                        <a href="/" class="back-link">← Back to Platform Home</a>
-                        <div class="stock-header">
-                            <h1>${profile.companyName} <span class="symbol">(${profile.symbol})</span></h1>
-                            <div class="price-info">
-                                <span>${formatNum(profile.price)} ${profile.currency}</span>
-                                <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum(changePct)}%)</span>
-                            </div>
-                        </div>
-                        <div class="dashboard-grid">
-                            <div class="card grid-col-span-2 profile-info">
-                                <h2>Company Profile</h2>
-                                <p><strong>Sector:</strong> ${profile.sector || 'N/A'}</p>
-                                <p><strong>Industry:</strong> ${profile.industry || 'N/A'}</p>
-                                <p><strong>Market Cap:</strong> ${Number(profile.mktCap).toLocaleString()} ${profile.currency}</p>
-                                <p class="description">${profile.description || 'No description available.'}</p>
-                            </div>
-                            <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2></div>
-                            <div class="card grid-col-span-3" id="peers-card"><h2>Peers Comparison</h2></div>
-                            <div class="card grid-col-span-3" id="shareholding-card"><h2>Top Institutional Holders</h2></div>
-                            <div class="card grid-col-span-1 metric-card" id="magic-formula-card"><h2>Magic Formula</h2></div>
-                            <div class="card grid-col-span-2" id="market-view-card"><h2>Market View Forecast</h2></div>
-                            <div class="card grid-col-span-3">
-                                <h2>Fundamental Checklist</h2>
-                                <ul class="checklist" id="analysis-checklist"></ul>
-                            </div>
-                        </div>
-                    `;
+                    document.getElementById('stock-header').innerHTML = `
+                        <h1>${profile.companyName} <span class="symbol">(${profile.symbol})</span></h1>
+                        <div class="price-info">
+                            <span>${formatNum(profile.price)} ${profile.currency}</span>
+                            <span class="${changeClass}">${formatNum(profile.changes)} (${formatNum(changePct)}%)</span>
+                        </div>`;
+                    
+                    document.getElementById('profile-card').innerHTML = `
+                        <h2>Company Profile</h2>
+                        <p><strong>Sector:</strong> ${profile.sector || 'N/A'}</p>
+                        <p><strong>Industry:</strong> ${profile.industry || 'N/A'}</p>
+                        <p><strong>Market Cap:</strong> ${Number(profile.mktCap).toLocaleString()} ${profile.currency}</p>
+                        <p class="description">${profile.description || 'No description available.'}</p>`;
+                })
+                .catch(err => {
+                    document.getElementById('stock-header').innerHTML = `<h1>Error loading profile for ${ticker}</h1>`;
+                    console.error(err);
+                });
 
-                    // Populate Institutional Buying Chart
-                    if (analysis.institutional_buying) {
-                        const pct = analysis.institutional_buying.ownership_pct;
-                        document.getElementById('inst-buying-card').innerHTML += `
+            // --- Fetch 2: Checklist Data ---
+            fetch(`/api/stock_checklist/${ticker}`)
+                .then(response => response.json())
+                .then(analysis => {
+                    let checklistHTML = '<ul class="checklist">';
+                    const simpleChecks = ['benjamin_graham', 'qual_quant_analysis', 'balance_sheet_analysis'];
+                    simpleChecks.forEach(key => {
+                        const item = analysis[key];
+                        if (item) {
+                            let sClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
+                            let sText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
+                            checklistHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${item.details}</div></li>`;
+                        }
+                    });
+                    // Magic Formula is special
+                    const mf = analysis.magic_formula;
+                    if(mf) {
+                        checklistHTML += `<li class="check-item"><div class="check-item-header"><span>Magic Formula</span></div><div class="check-item-details">ROCE: ${mf.roce}, Earnings Yield: ${mf.ey}</div></li>`;
+                    }
+                    checklistHTML += '</ul>';
+                    document.getElementById('analysis-checklist').innerHTML = checklistHTML;
+                });
+
+            // --- Fetch 3: Shareholding Data ---
+            fetch(`/api/stock_shareholding/${ticker}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ownership_pct) {
+                        const pct = data.ownership_pct;
+                        document.getElementById('inst-buying-card').innerHTML = `
+                            <h2>Institutional Ownership</h2>
                             <div class="chart-container">
                                 <canvas id="ownershipChart"></canvas>
                                 <div class="chart-label">${formatNum(pct, 1)}%<span>Owned</span></div>
                             </div>`;
                         new Chart(document.getElementById('ownershipChart'), { type: 'doughnut', data: { datasets: [{ data: [pct, 100 - pct], backgroundColor: ['#0366d6', '#e1e4e8'], borderWidth: 0 }] }, options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
                     }
+                    if (data.top_holders) {
+                        let tableHTML = '<h2>Top Institutional Holders</h2><table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
+                        data.top_holders.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
+                        document.getElementById('shareholding-card').innerHTML = tableHTML + '</tbody></table>';
+                    }
+                });
 
-                    // Populate Peers Comparison Table
-                    if (analysis.peers_comparison && analysis.peers_comparison.length > 0) {
-                        let tableHTML = '<table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
-                        analysis.peers_comparison.forEach(p => {
+            // --- Fetch 4: Peers Data ---
+            fetch(`/api/stock_peers/${ticker}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        let tableHTML = '<h2>Peers Comparison</h2><table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
+                        data.forEach(p => {
                             tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
                         });
-                        document.getElementById('peers-card').innerHTML += tableHTML + '</tbody></table>';
+                        document.getElementById('peers-card').innerHTML = tableHTML + '</tbody></table>';
                     }
-
-                    // Populate Shareholding Table
-                    if (analysis.share_holding_pattern) {
-                        let tableHTML = '<table><thead><tr><th>Holder</th><th>Shares</th><th>Date</th></tr></thead><tbody>';
-                        analysis.share_holding_pattern.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
-                        document.getElementById('shareholding-card').innerHTML += tableHTML + '</tbody></table>';
-                    }
-                    
-                    // Populate Magic Formula Card
-                    if (analysis.magic_formula) { document.getElementById('magic-formula-card').innerHTML += `<p class="value">${analysis.magic_formula.roce}<span>ROCE</span></p><p class="value">${analysis.magic_formula.ey}<span>Earnings Yield</span></p>`; }
-
-                    // Populate Market View Card
-                    if (analysis.market_view_forecast) {
-                        let listHTML = '<ul class="checklist">';
-                        analysis.market_view_forecast.forEach(line => { listHTML += `<li class="check-item">${line}</li>`; });
-                        document.getElementById('market-view-card').innerHTML += listHTML + '</ul>';
-                    }
-
-                    // Populate Simple Checklist
-                    const checklist = document.getElementById('analysis-checklist');
-                    const simpleChecks = ['benjamin_graham', 'piotroski_scan', 'canslim', 'darvas_scan', 'coffee_can', 'qual_quant_analysis', 'balance_sheet_analysis'];
-                    simpleChecks.forEach(key => {
-                        const item = analysis[key];
-                        if (item) {
-                            let sClass = item.pass === null ? 'status-na' : (item.pass ? 'status-pass' : 'status-fail');
-                            let sText = item.pass === null ? 'N/A' : (item.pass ? 'Pass' : 'Fail');
-                            checklist.innerHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${item.details}</div></li>`;
-                        }
-                    });
-                })
-                .catch(error => { mainContent.innerHTML = `<h1>Error</h1><p>Could not load analysis. Please try again.</p><a href="/" class="back-link">← Go Back</a>`; console.error('Error:', error); });
+                });
         });
     </script>
 </body>
