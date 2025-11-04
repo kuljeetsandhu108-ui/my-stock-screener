@@ -129,13 +129,12 @@ def run_darvas_scan():
             historical_data = requests.get(f"{BASE_URL}/historical-price-full/{ticker}?timeseries=65&apikey={API_KEY}").json().get('historical', [])
             if len(historical_data) < 60: continue
             historical_data.reverse()
-            current_price = historical_data[-1].get('close', 0)
-            current_volume = historical_data[-1].get('volume', 0)
+            current_price, current_volume = historical_data[-1]['close'], historical_data[-1]['volume']
             high_52_wk = float(requests.get(f"{BASE_URL}/profile/{ticker}?apikey={API_KEY}").json()[0].get('range', '0-0').split('-')[1])
             if not (current_price >= high_52_wk * 0.95): continue
-            recent_high = max(d.get('high', 0) for d in historical_data[-21:-1])
+            recent_high = max(d['high'] for d in historical_data[-21:-1])
             if not (current_price > recent_high): continue
-            avg_volume = statistics.mean(d.get('volume', 0) for d in historical_data[-21:-1])
+            avg_volume = statistics.mean(d['volume'] for d in historical_data[-21:-1])
             if avg_volume == 0 or not (current_volume > avg_volume * 1.5): continue
             darvas_stocks.append(f"{ticker} ({name})")
         except Exception: continue
@@ -183,10 +182,9 @@ def run_coffee_can_screener():
         try:
             metrics_data = requests.get(f"{BASE_URL}/key-metrics/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
             if not metrics_data or len(metrics_data) < 5: continue
-            roce_ok_years = sum(1 for year_data in metrics_data if (year_data.get('returnOnCapitalEmployed') or year_data.get('returnOnEquity') or 0) > 0.15)
+            roce_ok_years = sum(1 for y in metrics_data if (y.get('returnOnCapitalEmployed') or y.get('returnOnEquity') or 0) > 0.15)
             if roce_ok_years < 4: continue
-            growth_ok_years = 0
-            metrics_data.reverse()
+            growth_ok_years = 0; metrics_data.reverse()
             for j in range(1, len(metrics_data)):
                 current_revenue = metrics_data[j].get('revenuePerShare', 0) * metrics_data[j].get('sharesOutstanding', 1)
                 previous_revenue = metrics_data[j-1].get('revenuePerShare', 0) * metrics_data[j-1].get('sharesOutstanding', 1)
@@ -223,8 +221,7 @@ def run_balance_sheet_screener():
             metrics_data = requests.get(f"{BASE_URL}/key-metrics/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
             if not metrics_data or len(metrics_data) < 5: continue
             metrics_data.reverse()
-            initial_bvps = metrics_data[0].get('bookValuePerShare', 0)
-            final_bvps = metrics_data[-1].get('bookValuePerShare', 0)
+            initial_bvps, final_bvps = metrics_data[0].get('bookValuePerShare', 0), metrics_data[-1].get('bookValuePerShare', 0)
             if initial_bvps <= 0 or (final_bvps / initial_bvps) < 1.3: continue
             growth_years = sum(1 for j in range(1, len(metrics_data)) if metrics_data[j].get('bookValuePerShare', 0) > metrics_data[j-1].get('bookValuePerShare', 0))
             if growth_years < 3: continue
@@ -237,113 +234,82 @@ def run_market_view_forecast():
     print("Analyzing Indian market trend (NIFTY 50)...")
     try:
         market_data = requests.get(f"{BASE_URL}/historical-price-full/^NSEI?from={date.today() - timedelta(days=300)}&to={date.today()}&apikey={API_KEY}").json().get('historical', [])
-        if not market_data or len(market_data) < 200: return ["Error: Could not fetch enough market data to determine the trend."]
+        if not market_data or len(market_data) < 200: return ["Error: Could not fetch enough market data."]
         market_data.reverse()
         prices = [item['close'] for item in market_data]
-        current_price = prices[-1]
-        sma_50 = statistics.mean(prices[-50:])
-        sma_200 = statistics.mean(prices[-200:])
+        current_price, sma_50, sma_200 = prices[-1], statistics.mean(prices[-50:]), statistics.mean(prices[-200:])
         verdict = "Uncertain / Sideways"
         if current_price > sma_50 and sma_50 > sma_200: verdict = "Strong Uptrend (Bullish)"
         elif current_price > sma_50 and current_price > sma_200: verdict = "Uptrend (Bullish)"
         elif current_price < sma_50 and sma_50 < sma_200: verdict = "Strong Downtrend (Bearish)"
         elif current_price < sma_50 and current_price < sma_200: verdict = "Downtrend (Bearish)"
-        return [f"Index: NIFTY 50 (^NSEI)", f"Current Price: {current_price:,.2f}", f"50-Day Avg: {sma_50:,.2f}", f"200-Day Avg: {sma_200:,.2f}", f"Verdict: {verdict}"]
-    except Exception as e: return [f"An error occurred while analyzing the market: {e}"]
+        return [f"Index: NIFTY 50", f"Current Price: {current_price:,.2f}", f"50-Day Avg: {sma_50:,.2f}", f"200-Day Avg: {sma_200:,.2f}", f"Verdict: {verdict}"]
+    except Exception as e: return [f"An error occurred: {e}"]
 
-# --- PART 2: THE COMPLETE 12-POINT Single-Stock Evaluation Engine ---
+# --- PART 2: THE ULTIMATE 12-POINT ANALYSIS ENGINE ---
 
-def evaluate_stock_for_all_criteria(ticker):
-    print(f"Running COMPLETE 12-point analysis for {ticker}...")
-    analysis = {}
+def get_full_stock_analysis(ticker):
+    print(f"Running ULTIMATE 12-point analysis for {ticker}...")
     try:
         profile = requests.get(f"{BASE_URL}/profile/{ticker}?apikey={API_KEY}").json()[0]
         ratios_ttm = requests.get(f"{BASE_URL}/ratios-ttm/{ticker}?apikey={API_KEY}").json()[0]
-        annual_ratios = requests.get(f"{BASE_URL}/ratios/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
         annual_metrics = requests.get(f"{BASE_URL}/key-metrics/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
+        annual_ratios = requests.get(f"{BASE_URL}/ratios/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
         quarterly_income = requests.get(f"{BASE_URL}/income-statement/{ticker}?period=quarter&limit=5&apikey={API_KEY}").json()
         holders = requests.get(f"{BASE_URL}/institutional-holder/{ticker}?apikey={API_KEY}").json()
         historical_data_raw = requests.get(f"{BASE_URL}/historical-price-full/{ticker}?timeseries=65&apikey={API_KEY}").json().get('historical', [])
         if historical_data_raw: historical_data_raw.reverse()
+        industry, sector = profile.get('industry'), profile.get('sector')
+        peers_list = []
+        if industry:
+            peers_params = {'industry': industry, 'sector': sector, 'exchange': 'NSE,BSE', 'limit': 10, 'apikey': API_KEY}
+            peers_response = requests.get(f"{BASE_URL}/stock-screener", params=peers_params).json()
+            peers_list = [p for p in peers_response if p['symbol'] != ticker.upper()]
     except Exception: return {'error': f"Could not fetch data for {ticker}. It may be invalid or not supported."}
 
-    # 1. Benjamin Graham
-    pe = ratios_ttm.get('priceEarningsRatioTTM'); pb = ratios_ttm.get('priceToBookRatioTTM')
-    analysis['benjamin_graham'] = {'pass': pe is not None and pb is not None and pe < 15 and pb < 1.5, 'details': f"P/E: {pe:.2f} (Req:<15), P/B: {pb:.2f} (Req:<1.5)"}
-
-    # 2. Piotroski Scan
-    if len(annual_ratios) > 1:
-        cy, py = annual_ratios[0], annual_ratios[1]
-        f_score = sum([cy.get(k, 0) > py.get(k, 0) for k in ['returnOnAssets', 'currentRatio', 'assetTurnover', 'grossProfitMargin']]) + sum([cy.get(k, 0) > 0 for k in ['returnOnAssets', 'operatingCashFlowPerShare']]) + (cy.get('operatingCashFlowPerShare', 0) > cy.get('netIncomePerShare', 0)) + (cy.get('debtEquityRatio', float('inf')) < py.get('debtEquityRatio', float('inf')))
-        analysis['piotroski_scan'] = {'pass': f_score >= 8, 'details': f"F-Score: {f_score}/8. (Req: >=8)"}
-    else: analysis['piotroski_scan'] = {'pass': None, 'details': 'Not enough annual data.'}
-
-    # 3. Institutional Buying
-    if len(holders) > 1:
-        holders.sort(key=lambda x: x['date'], reverse=True)
-        is_pass = holders[0].get('totalHolding', 0) > holders[1].get('totalHolding', 0)
-        analysis['fii_buying'] = {'pass': is_pass, 'details': f"Ownership recently {'Increased' if is_pass else 'Decreased/Stable'}"}
-    else: analysis['fii_buying'] = {'pass': None, 'details': 'Not enough ownership data.'}
-
-    # 4. CANSLIM
-    try:
-        q_eps_now, q_eps_then = quarterly_income[0].get('eps', 0), quarterly_income[4].get('eps', 0)
-        qg = ((q_eps_now - q_eps_then) / q_eps_then) > 0.25 if q_eps_then and q_eps_then > 0 else False
-        nh = profile.get('price', 0) > (float(profile.get('range', '0-0').split('-')[1]) * 0.75)
-        analysis['canslim'] = {'pass': qg and nh, 'details': f"Qtrly EPS Growth>25%: {'Yes' if qg else 'No'}. Near 52-Wk High: {'Yes' if nh else 'No'}"}
-    except: analysis['canslim'] = {'pass': None, 'details': 'Incomplete data.'}
-
-    # 5. Darvas Scan
-    try:
-        price, volume = historical_data_raw[-1]['close'], historical_data_raw[-1]['volume']
-        nh = price >= (float(profile.get('range', '0-0').split('-')[1]) * 0.95)
-        bo = price > max(d['high'] for d in historical_data_raw[-21:-1])
-        hv = volume > (statistics.mean(d['volume'] for d in historical_data_raw[-21:-1]) * 1.5)
-        analysis['darvas_scan'] = {'pass': nh and bo and hv, 'details': f"Breakout on high volume near 52-wk high? {'Yes' if (nh and bo and hv) else 'No'}"}
-    except: analysis['darvas_scan'] = {'pass': None, 'details': 'Incomplete historical data.'}
-
-    # 6. Magic Formula
-    roce, ey = ratios_ttm.get('returnOnCapitalEmployedTTM'), ratios_ttm.get('earningsYieldTTM')
-    if roce is not None and ey is not None:
-        analysis['magic_formula'] = {'pass': roce > 0.15 and ey > 0.05, 'details': f"ROCE: {roce:.2%}, Earnings Yield: {ey:.2%}"}
-    else: analysis['magic_formula'] = {'pass': None, 'details': 'Data unavailable.'}
-
-    # 7. Coffee Can Investing
-    try:
-        roce_ok = sum(1 for y in annual_metrics if (y.get('returnOnCapitalEmployed') or y.get('returnOnEquity') or 0) > 0.15) >= 4
-        analysis['coffee_can'] = {'pass': roce_ok, 'details': f"High ROCE for 4 of 5 years? {'Yes' if roce_ok else 'No'}"}
-    except: analysis['coffee_can'] = {'pass': None, 'details': 'Incomplete historical data.'}
-
-    # 8. High-Quality Score
-    roe, gpm, de = ratios_ttm.get('returnOnEquityTTM', 0), ratios_ttm.get('grossProfitMarginTTM', 0), ratios_ttm.get('debtEquityRatioTTM', 999)
-    is_pass = roe > 0.15 and gpm > 0.30 and de < 1.0
-    analysis['qual_quant_analysis'] = {'pass': is_pass, 'details': f"ROE>15%: {roe:.2%}, Margin>30%: {gpm:.2%}, D/E<1: {de:.2f}"}
+    analysis = {}
     
-    # 9. Strong Balance Sheet
-    try:
-        bvps_growth = sum(1 for j in range(1, len(annual_metrics)) if annual_metrics[j].get('bookValuePerShare', 0) > annual_metrics[j-1].get('bookValuePerShare', 0)) >= 3
-        is_pass = ratios_ttm.get('currentRatioTTM', 0) > 1.5 and ratios_ttm.get('debtEquityRatioTTM', 999) < 1.0 and bvps_growth
-        analysis['balance_sheet_analysis'] = {'pass': is_pass, 'details': f"Strong ratios & growing Book Value? {'Yes' if is_pass else 'No'}"}
-    except: analysis['balance_sheet_analysis'] = {'pass': None, 'details': 'Incomplete historical data.'}
+    # Simple Checks
+    pe, pb = ratios_ttm.get('priceEarningsRatioTTM'), ratios_ttm.get('priceToBookRatioTTM')
+    roe, gpm, de = ratios_ttm.get('returnOnEquityTTM', 0), ratios_ttm.get('grossProfitMarginTTM', 0), ratios_ttm.get('debtEquityRatioTTM', 999)
+    analysis['benjamin_graham'] = {'pass': pe is not None and pb is not None and pe < 15 and pb < 1.5, 'details': f"P/E: {pe:.2f} (Req:<15), P/B: {pb:.2f} (Req:<1.5)"}
+    analysis['qual_quant_analysis'] = {'pass': roe > 0.15 and gpm > 0.30 and de < 1.0, 'details': f"ROE>15%: {roe:.2%}, Margin>30%: {gpm:.2%}, D/E<1: {de:.2f}"}
 
-    # 10. Market View Forecast
-    analysis['market_view_forecast'] = {'pass': None, 'details': 'Market-wide indicator. See main screener tab.'}
+    # Complex Checks
+    try: analysis['piotroski_scan'] = {'pass': sum([annual_ratios[0].get(k, 0) > annual_ratios[1].get(k, 0) for k in ['returnOnAssets', 'currentRatio']]) + (annual_ratios[0].get('returnOnAssets',0)>0) >= 2, 'details': f"Score (simp.): {sum([annual_ratios[0].get(k, 0) > annual_ratios[1].get(k, 0) for k in ['returnOnAssets', 'currentRatio']]) + (annual_ratios[0].get('returnOnAssets',0)>0)}/3"}
+    except: analysis['piotroski_scan'] = {'pass': None, 'details': 'Incomplete data.'}
+    try: analysis['canslim'] = {'pass': (((quarterly_income[0].get('eps', 0) - quarterly_income[4].get('eps', 0)) / quarterly_income[4].get('eps', 0)) > 0.25 if quarterly_income[4].get('eps',0)>0 else False) and (profile.get('price', 0) > (float(profile.get('range', '0-0').split('-')[1]) * 0.75)), 'details': 'Checks Qtrly EPS Growth > 25% & Price near 52-wk high.'}
+    except: analysis['canslim'] = {'pass': None, 'details': 'Incomplete data.'}
+    try: analysis['darvas_scan'] = {'pass': (historical_data_raw[-1]['close'] >= (float(profile.get('range', '0-0').split('-')[1]) * 0.95)) and (historical_data_raw[-1]['close'] > max(d['high'] for d in historical_data_raw[-21:-1])) and (historical_data_raw[-1]['volume'] > (statistics.mean(d['volume'] for d in historical_data_raw[-21:-1]) * 1.5)), 'details': 'Checks for breakout on high volume near 52-wk high.'}
+    except: analysis['darvas_scan'] = {'pass': None, 'details': 'Incomplete data.'}
+    try: analysis['coffee_can'] = {'pass': sum(1 for y in annual_metrics if (y.get('returnOnCapitalEmployed') or y.get('returnOnEquity') or 0) > 0.15) >= 4, 'details': f"High ROCE in {sum(1 for y in annual_metrics if (y.get('returnOnCapitalEmployed') or y.get('returnOnEquity') or 0) > 0.15)} of last 5 yrs."}
+    except: analysis['coffee_can'] = {'pass': None, 'details': 'Incomplete data.'}
+    try: analysis['balance_sheet_analysis'] = {'pass': ratios_ttm.get('currentRatioTTM', 0) > 1.5 and de < 1.0 and sum(1 for j in range(1, len(annual_metrics)) if annual_metrics[j].get('bookValuePerShare', 0) > annual_metrics[j-1].get('bookValuePerShare', 0)) >= 3, 'details': 'Checks for strong ratios and growing book value.'}
+    except: analysis['balance_sheet_analysis'] = {'pass': None, 'details': 'Incomplete data.'}
 
-    # 11. Share Holding Pattern
-    analysis['share_holding_pattern'] = {'pass': None, 'details': f"Top Holder: {holders[0]['holder'] if holders else 'N/A'}"}
-
-    # 12. Peers Comparison
-    analysis['peers_comparison'] = {'pass': None, 'details': f"Industry: {profile.get('industry', 'N/A')}"}
+    # Data-Rich Components
+    analysis['market_view_forecast'] = run_market_view_forecast()
+    analysis['magic_formula'] = {'roce': f"{ratios_ttm.get('returnOnCapitalEmployedTTM'):.2%}" if ratios_ttm.get('returnOnCapitalEmployedTTM') is not None else "N/A", 'ey': f"{ratios_ttm.get('earningsYieldTTM'):.2%}" if ratios_ttm.get('earningsYieldTTM') is not None else "N/A"}
+    if holders:
+        total_shares = profile.get('sharesOutstanding', 0)
+        total_inst_shares = sum(h.get('shares', 0) for h in holders)
+        analysis['share_holding_pattern'] = [{'holder': h['holder'], 'shares': f"{h.get('shares', 0):,}", 'date': h['date']} for h in sorted(holders, key=lambda x: x.get('shares', 0), reverse=True)[:10]]
+        analysis['institutional_buying'] = {'ownership_pct': (total_inst_shares / total_shares * 100) if total_shares > 0 else 0}
+    
+    peers_data = [{'symbol': ticker, **(requests.get(f"{BASE_URL}/ratios-ttm/{ticker}?apikey={API_KEY}").json()[0])}]
+    for peer in peers_list[:4]:
+        try: peers_data.append({'symbol': peer['symbol'], **(requests.get(f"{BASE_URL}/ratios-ttm/{peer['symbol']}?apikey={API_KEY}").json()[0])})
+        except: continue
+    analysis['peers_comparison'] = peers_data
 
     return {'profile': profile, 'analysis': analysis}
-
 
 # --- API Routes ---
 @app.route('/')
 def home(): return render_template('index.html', features=features)
 
 @app.route('/stock/<ticker>')
-def stock_details_page(ticker): return render_template('stock_details.html', ticker=ticker, features=features)
+def stock_details_page(ticker): return render_template('stock_details.html', ticker=ticker)
 
 @app.route('/api/search')
 def search_stocks():
@@ -353,7 +319,7 @@ def search_stocks():
     except: return jsonify([])
 
 @app.route('/api/stock_analysis/<ticker>')
-def get_stock_analysis(ticker): return jsonify(evaluate_stock_for_all_criteria(ticker))
+def get_stock_analysis(ticker): return jsonify(get_full_stock_analysis(ticker))
 
 @app.route('/run_screener/<screener_key>')
 def run_screener_api(screener_key):
@@ -362,7 +328,6 @@ def run_screener_api(screener_key):
     if not force_refresh and screener_key in screener_cache:
         if current_time - screener_cache[screener_key]['timestamp'] < CACHE_DURATION_SECONDS:
             return jsonify(results=screener_cache[screener_key]['data'])
-
     screener_functions = {
         "benjamin_graham": run_benjamin_graham_screener, "piotroski_scan": run_piotroski_scan,
         "fii_buying": run_fii_buying_screener, "canslim": run_canslim_screener,
@@ -373,7 +338,6 @@ def run_screener_api(screener_key):
     results = screener_functions.get(screener_key, lambda: [])()
     screener_cache[screener_key] = {'timestamp': current_time, 'data': results}
     return jsonify(results=results)
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
