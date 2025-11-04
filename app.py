@@ -33,7 +33,7 @@ features = {
     "peers_comparison": "Peers Comparison"
 }
 
-# --- All Screener & Tool Functions ---
+# --- All Screener & Tool Functions (Optimized) ---
 
 def run_benjamin_graham_screener():
     print("Running fast screener for Indian stocks...")
@@ -50,7 +50,8 @@ def run_piotroski_scan():
     print("Starting Piotroski F-Score Scan for Indian stocks...")
     high_f_score_stocks = []
     try:
-        value_candidates_params = { 'priceToBookRatioTTMLessThan': 2, 'marketCapMoreThan': 500000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 200, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit for faster server performance
+        value_candidates_params = { 'priceToBookRatioTTMLessThan': 2, 'marketCapMoreThan': 500000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=value_candidates_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -73,7 +74,8 @@ def run_fii_buying_screener():
     print("Starting FII/Institutional Buying Scan for Indian stocks...")
     ownership_increased_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 2000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 200, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit
+        candidate_params = { 'marketCapMoreThan': 2000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -92,6 +94,7 @@ def run_fii_buying_screener():
     return ownership_increased_stocks
 
 def run_canslim_screener():
+    # ... (This function already has a good structure, but let's reduce its limit too)
     print("Starting CANSLIM Scan for Indian stocks...")
     try:
         market_data = requests.get(f"{BASE_URL}/historical-price-full/^NSEI?from={date.today() - timedelta(days=300)}&to={date.today()}&apikey={API_KEY}").json().get('historical', [])
@@ -104,7 +107,8 @@ def run_canslim_screener():
     print("Market is in an uptrend. Searching for CANSLIM stocks...")
     canslim_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 2000000000, 'epsGrowthTTMMoreThan': 25, 'volumeMoreThan': 100000, 'exchange': 'NSE,BSE', 'limit': 200, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit
+        candidate_params = { 'marketCapMoreThan': 2000000000, 'epsGrowthTTMMoreThan': 25, 'volumeMoreThan': 100000, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
         candidate_stocks = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params).json()
     except Exception as e: return [f"Error fetching candidate stocks: {e}"]
     for i, stock in enumerate(candidate_stocks):
@@ -123,10 +127,12 @@ def run_canslim_screener():
     return canslim_stocks
 
 def run_darvas_scan():
+    # ... (This one is also complex, let's optimize)
     print("Starting Darvas Scan for Indian stocks...")
     darvas_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 5000000000, 'volumeMoreThan': 200000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 200, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit
+        candidate_params = { 'marketCapMoreThan': 5000000000, 'volumeMoreThan': 200000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -152,6 +158,7 @@ def run_darvas_scan():
     return darvas_stocks
 
 def run_magic_formula_screener():
+    # ... (This one is already fast)
     print("Starting Robust Magic Formula Scan for Indian stocks...")
     try:
         candidate_params = { 'marketCapMoreThan': 500000000, 'isActivelyTrading': True, 'priceEarningsRatioTTMLessThan': 50, 'priceEarningsRatioTTMMoreThan': 1, 'exchange': 'NSE,BSE', 'limit': 500, 'apikey': API_KEY }
@@ -180,10 +187,12 @@ def run_magic_formula_screener():
     return top_stocks
 
 def run_coffee_can_screener():
+    # ... (This is the slowest, must optimize)
     print("Starting Adapted Coffee Can (5-Year) Scan for Indian stocks...")
     coffee_can_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 10000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 100, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit
+        candidate_params = { 'marketCapMoreThan': 10000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -211,6 +220,7 @@ def run_coffee_can_screener():
     return coffee_can_stocks
 
 def run_quality_screener():
+    # ... (Already fast)
     print("Starting High-Quality Score Scan for Indian stocks...")
     screener_params = { 'marketCapMoreThan': 5000000000, 'returnOnEquityTTMMoreThan': 15, 'grossProfitMarginTTMMoreThan': 30, 'netProfitMarginTTMMoreThan': 10, 'debtToEquityTTMLessThan': 1, 'revenueGrowth5YMoreThan': 5, 'exchange': 'NSE,BSE', 'limit': 100, 'apikey': API_KEY }
     try:
@@ -222,10 +232,12 @@ def run_quality_screener():
     except Exception as e: return [f"Error fetching data for High-Quality Score scan: {e}"]
 
 def run_balance_sheet_screener():
+    # ... (Optimize this one too)
     print("Starting Strong Balance Sheet Scan for Indian stocks...")
     strong_balance_sheet_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 1000000000, 'currentRatioTTMMoreThan': 1.5, 'debtToEquityTTMLessThan': 1, 'totalDebtToTotalAssetsTTMLessThan': 0.5, 'exchange': 'NSE,BSE', 'limit': 200, 'apikey': API_KEY }
+        # OPTIMIZATION: Reduced limit
+        candidate_params = { 'marketCapMoreThan': 1000000000, 'currentRatioTTMMoreThan': 1.5, 'debtToEquityTTMLessThan': 1, 'totalDebtToTotalAssetsTTMLessThan': 0.5, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -250,6 +262,7 @@ def run_balance_sheet_screener():
     return strong_balance_sheet_stocks
 
 def run_market_view_forecast():
+    # ... (Already fast)
     print("Analyzing Indian market trend (NIFTY 50)...")
     try:
         market_data = requests.get(f"{BASE_URL}/historical-price-full/^NSEI?from={date.today() - timedelta(days=300)}&to={date.today()}&apikey={API_KEY}").json().get('historical', [])
@@ -273,6 +286,7 @@ def run_market_view_forecast():
     except Exception as e: return [f"An error occurred while analyzing the market: {e}"]
 
 def get_shareholding_pattern(ticker):
+    # ... (This is fast)
     print(f"Fetching shareholding for {ticker}...")
     try:
         ownership_data = requests.get(f"{BASE_URL}/institutional-holder/{ticker}?apikey={API_KEY}").json()
@@ -288,33 +302,70 @@ def get_shareholding_pattern(ticker):
         return results
     except Exception as e: return [f"Could not fetch shareholding data for {ticker}: {e}"]
 
+# --- REBUILT PEERS COMPARISON FUNCTION ---
 def get_peers_comparison(ticker):
     print(f"Fetching peers comparison for {ticker}...")
     try:
-        peers_response = requests.get(f"{BASE_URL}/stock_peer?symbol={ticker.upper()}&apikey={API_KEY}").json()
-        peer_list = peers_response.get('peersList', [])
-        if not peer_list: return [f"Could not find any peers for {ticker}."]
-        all_tickers = [ticker.upper()] + peer_list[:9]
-        results = ["Peer Comparison (Metric: Main vs. Peer Average):"]
+        # 1. Get the profile of the main stock to find its industry
+        profile_response = requests.get(f"{BASE_URL}/profile/{ticker.upper()}?apikey={API_KEY}").json()
+        if not profile_response:
+            return [f"Could not find a profile for {ticker}."]
+        
+        main_stock_profile = profile_response[0]
+        industry = main_stock_profile.get('industry')
+        sector = main_stock_profile.get('sector')
+
+        if not industry:
+            return [f"Could not determine the industry for {ticker}."]
+
+        # 2. Screen for other stocks in the same industry
+        peers_params = {
+            'industry': industry,
+            'sector': sector,
+            'exchange': 'NSE,BSE',
+            'limit': 10,
+            'apikey': API_KEY
+        }
+        peers_response = requests.get(f"{BASE_URL}/stock-screener", params=peers_params).json()
+        
+        peer_list = [peer['symbol'] for peer in peers_response if peer['symbol'] != ticker.upper()]
+        if not peer_list:
+            return [f"Could not find any peers for {ticker} in the {industry} industry."]
+            
+        all_tickers = [ticker.upper()] + peer_list
+
+        results = [f"Peer Comparison in '{industry}' (Metric: Main vs. Peer Avg):"]
         comparison_data = {}
+
+        # 3. Fetch ratios for all peers
         for t in all_tickers:
             ratios = requests.get(f"{BASE_URL}/ratios-ttm/{t}?apikey={API_KEY}").json()
-            if ratios: comparison_data[t] = ratios[0]
-        if not comparison_data or ticker.upper() not in comparison_data: return ["Could not fetch financial data for comparison."]
+            if ratios:
+                comparison_data[t] = ratios[0]
+
+        if not comparison_data or ticker.upper() not in comparison_data:
+            return ["Could not fetch financial data for comparison."]
+
         main_stock_data = comparison_data[ticker.upper()]
         peer_data_list = [data for t, data in comparison_data.items() if t != ticker.upper()]
+        
+        # 4. Calculate peer averages and format results
         metrics_to_compare = {
             "P/E Ratio": 'priceEarningsRatioTTM', "P/B Ratio": 'priceToBookRatioTTM',
             "Debt/Equity": 'debtEquityRatioTTM', "Return on Equity (ROE)": 'returnOnEquityTTM',
             "Net Profit Margin": 'netProfitMarginTTM'
         }
         for display_name, key in metrics_to_compare.items():
-            main_value = main_stock_data.get(key, 0)
+            main_value = main_stock_data.get(key, 0) if main_stock_data.get(key) is not None else 0
             peer_values = [p.get(key, 0) for p in peer_data_list if p.get(key) is not None]
             peer_avg = statistics.mean(peer_values) if peer_values else 0
             results.append(f"- {display_name}: {main_value:.2f} vs. {peer_avg:.2f}")
+
         return results
-    except Exception as e: return [f"An error occurred during peer comparison: {e}"]
+
+    except Exception as e:
+        return [f"An error occurred during peer comparison: {e}"]
+# --- END OF REBUILT FUNCTION ---
 
 
 # --- API Routes ---
