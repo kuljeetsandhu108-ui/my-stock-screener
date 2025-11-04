@@ -43,6 +43,7 @@
         .metric-card { text-align: center; }
         .metric-card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.5rem; }
         .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 2rem auto; }
+        .error-message { text-align: center; color: #721c24; padding: 2rem; font-style: italic; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 768px) { body { padding: 1rem; } .dashboard-grid { grid-template-columns: 1fr; } .stock-header h1 { font-size: 1.8rem; } .price-info { font-size: 1.5rem; } }
@@ -52,12 +53,8 @@
     <div class="main-container">
         <a href="/" class="back-link">← Back to Platform Home</a>
         
-        <!-- Header - Populated First -->
-        <div class="stock-header" id="stock-header">
-            <div class="loader"></div>
-        </div>
+        <div class="stock-header" id="stock-header"><div class="loader"></div></div>
 
-        <!-- Dashboard Grid -->
         <div class="dashboard-grid">
             <div class="card grid-col-span-2 profile-info" id="profile-card"><h2>Company Profile</h2><div class="loader"></div></div>
             <div class="card grid-col-span-1" id="inst-buying-card"><h2>Institutional Ownership</h2><div class="loader"></div></div>
@@ -72,7 +69,8 @@
 
     <script>
         const ticker = "{{ ticker }}";
-        const formatNum = (num, decimals = 2) => num !== null && num !== undefined ? Number(num).toFixed(decimals) : 'N/A';
+        const mainContent = document.getElementById('main-content');
+        const formatNum = (num, decimals = 2) => (num !== null && num !== undefined && !isNaN(num)) ? Number(num).toFixed(decimals) : 'N/A';
 
         document.addEventListener('DOMContentLoaded', () => {
             
@@ -100,6 +98,7 @@
                 })
                 .catch(err => {
                     document.getElementById('stock-header').innerHTML = `<h1>Error loading profile for ${ticker}</h1>`;
+                    document.getElementById('profile-card').innerHTML = `<div class="error-message">Could not load profile data.</div>`;
                     console.error(err);
                 });
 
@@ -107,6 +106,7 @@
             fetch(`/api/stock_checklist/${ticker}`)
                 .then(response => response.json())
                 .then(analysis => {
+                    if (Object.keys(analysis).length === 0) { throw new Error('Empty checklist response'); }
                     let checklistHTML = '<ul class="checklist">';
                     const simpleChecks = ['benjamin_graham', 'qual_quant_analysis', 'balance_sheet_analysis'];
                     simpleChecks.forEach(key => {
@@ -117,23 +117,24 @@
                             checklistHTML += `<li class="check-item"><div class="check-item-header"><span>${features[key]}</span><span class="status ${sClass}">${sText}</span></div><div class="check-item-details">${item.details}</div></li>`;
                         }
                     });
-                    // Magic Formula is special
                     const mf = analysis.magic_formula;
-                    if(mf) {
-                        checklistHTML += `<li class="check-item"><div class="check-item-header"><span>Magic Formula</span></div><div class="check-item-details">ROCE: ${mf.roce}, Earnings Yield: ${mf.ey}</div></li>`;
-                    }
+                    if(mf) { checklistHTML += `<li class="check-item"><div class="check-item-header"><span>Magic Formula</span></div><div class="check-item-details">ROCE: ${mf.roce}, Earnings Yield: ${mf.ey}</div></li>`; }
                     checklistHTML += '</ul>';
                     document.getElementById('analysis-checklist').innerHTML = checklistHTML;
+                })
+                .catch(err => {
+                    document.getElementById('analysis-checklist').innerHTML = `<div class="error-message">Could not load checklist data.</div>`;
+                    console.error(err);
                 });
 
             // --- Fetch 3: Shareholding Data ---
             fetch(`/api/stock_shareholding/${ticker}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.ownership_pct) {
+                    if (!data || Object.keys(data).length === 0) { throw new Error('Empty shareholding response'); }
+                    if (data.ownership_pct !== undefined) {
                         const pct = data.ownership_pct;
-                        document.getElementById('inst-buying-card').innerHTML = `
-                            <h2>Institutional Ownership</h2>
+                        document.getElementById('inst-buying-card').innerHTML = `<h2>Institutional Ownership</h2>
                             <div class="chart-container">
                                 <canvas id="ownershipChart"></canvas>
                                 <div class="chart-label">${formatNum(pct, 1)}%<span>Owned</span></div>
@@ -145,19 +146,27 @@
                         data.top_holders.forEach(h => { tableHTML += `<tr><td>${h.holder}</td><td>${h.shares}</td><td>${h.date}</td></tr>`; });
                         document.getElementById('shareholding-card').innerHTML = tableHTML + '</tbody></table>';
                     }
+                })
+                .catch(err => {
+                    document.getElementById('inst-buying-card').innerHTML = `<h2>Institutional Ownership</h2><div class="error-message">Could not load data.</div>`;
+                    document.getElementById('shareholding-card').innerHTML = `<h2>Top Institutional Holders</h2><div class="error-message">Could not load data.</div>`;
+                    console.error(err);
                 });
 
             // --- Fetch 4: Peers Data ---
             fetch(`/api/stock_peers/${ticker}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.length > 0) {
-                        let tableHTML = '<h2>Peers Comparison</h2><table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
-                        data.forEach(p => {
-                            tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
-                        });
-                        document.getElementById('peers-card').innerHTML = tableHTML + '</tbody></table>';
-                    }
+                    if (!data || data.length === 0) { throw new Error('Empty peers response'); }
+                    let tableHTML = '<h2>Peers Comparison</h2><table><thead><tr><th>Symbol</th><th>P/E</th><th>P/B</th><th>ROE</th><th>D/E</th></tr></thead><tbody>';
+                    data.forEach(p => {
+                        tableHTML += `<tr class="${p.symbol === ticker.toUpperCase() ? 'main-stock-row' : ''}"><td>${p.symbol}</td><td>${formatNum(p.priceEarningsRatioTTM)}</td><td>${formatNum(p.priceToBookRatioTTM)}</td><td>${formatNum(p.returnOnEquityTTM * 100)}%</td><td>${formatNum(p.debtEquityRatioTTM)}</td></tr>`;
+                    });
+                    document.getElementById('peers-card').innerHTML = tableHTML + '</tbody></table>';
+                })
+                .catch(err => {
+                    document.getElementById('peers-card').innerHTML = `<h2>Peers Comparison</h2><div class="error-message">Could not load data.</div>`;
+                    console.error(err);
                 });
         });
     </script>
