@@ -1,7 +1,7 @@
 import os
 import requests
 import statistics
-import time # Import the time module
+import time
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 from datetime import date, timedelta
@@ -23,22 +23,14 @@ CACHE_DURATION_SECONDS = 2 * 60 * 60 # 2 hours
 # --- List of All Features ---
 features = {
     # Screeners
-    "benjamin_graham": "Benjamin Graham",
-    "piotroski_scan": "Piotroski Scan",
-    "fii_buying": "Institutional Buying",
-    "canslim": "CANSLIM",
-    "darvas_scan": "Darvas Scan",
-    "magic_formula": "Magic Formula",
-    "coffee_can": "Coffee Can Investing",
-    "qual_quant_analysis": "High-Quality Score",
-    "balance_sheet_analysis": "Strong Balance Sheet",
-    "market_view_forecast": "Market View Forecast",
-    # Single-Stock Analysis Tools
-    "share_holding_pattern": "Share Holding Pattern",
-    "peers_comparison": "Peers Comparison"
+    "benjamin_graham": "Benjamin Graham", "piotroski_scan": "Piotroski Scan",
+    "fii_buying": "Institutional Buying", "canslim": "CANSLIM",
+    "darvas_scan": "Darvas Scan", "magic_formula": "Magic Formula",
+    "coffee_can": "Coffee Can Investing", "qual_quant_analysis": "High-Quality Score",
+    "balance_sheet_analysis": "Strong Balance Sheet", "market_view_forecast": "Market View Forecast",
 }
 
-# --- All Screener & Tool Functions (Optimized) ---
+# --- PART 1: Screener Functions ---
 
 def run_benjamin_graham_screener():
     print("Running fast screener for Indian stocks...")
@@ -55,7 +47,7 @@ def run_piotroski_scan():
     print("Starting Piotroski F-Score Scan for Indian stocks...")
     high_f_score_stocks = []
     try:
-        value_candidates_params = { 'priceToBookRatioTTMLessThan': 2, 'marketCapMoreThan': 500000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
+        value_candidates_params = { 'priceToBookRatioTTMLessThan': 2, 'marketCapMoreThan': 500000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=value_candidates_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -78,7 +70,7 @@ def run_fii_buying_screener():
     print("Starting FII/Institutional Buying Scan for Indian stocks...")
     ownership_increased_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 2000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
+        candidate_params = { 'marketCapMoreThan': 2000000000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -109,7 +101,7 @@ def run_canslim_screener():
     print("Market is in an uptrend. Searching for CANSLIM stocks...")
     canslim_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 2000000000, 'epsGrowthTTMMoreThan': 25, 'volumeMoreThan': 100000, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
+        candidate_params = { 'marketCapMoreThan': 2000000000, 'epsGrowthTTMMoreThan': 25, 'volumeMoreThan': 100000, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         candidate_stocks = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params).json()
     except Exception as e: return [f"Error fetching candidate stocks: {e}"]
     for i, stock in enumerate(candidate_stocks):
@@ -131,7 +123,7 @@ def run_darvas_scan():
     print("Starting Darvas Scan for Indian stocks...")
     darvas_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 5000000000, 'volumeMoreThan': 200000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
+        candidate_params = { 'marketCapMoreThan': 5000000000, 'volumeMoreThan': 200000, 'isActivelyTrading': True, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -230,7 +222,7 @@ def run_balance_sheet_screener():
     print("Starting Strong Balance Sheet Scan for Indian stocks...")
     strong_balance_sheet_stocks = []
     try:
-        candidate_params = { 'marketCapMoreThan': 1000000000, 'currentRatioTTMMoreThan': 1.5, 'debtToEquityTTMLessThan': 1, 'totalDebtToTotalAssetsTTMLessThan': 0.5, 'exchange': 'NSE,BSE', 'limit': 75, 'apikey': API_KEY }
+        candidate_params = { 'marketCapMoreThan': 1000000000, 'currentRatioTTMMoreThan': 1.5, 'debtToEquityTTMLessThan': 1, 'totalDebtToTotalAssetsTTMLessThan': 0.5, 'exchange': 'NSE,BSE', 'limit': 50, 'apikey': API_KEY }
         response = requests.get(f"{BASE_URL}/stock-screener", params=candidate_params)
         response.raise_for_status()
         candidate_stocks = response.json()
@@ -277,62 +269,70 @@ def run_market_view_forecast():
         return results
     except Exception as e: return [f"An error occurred while analyzing the market: {e}"]
 
-def get_shareholding_pattern(ticker):
-    print(f"Fetching shareholding for {ticker}...")
-    try:
-        ownership_data = requests.get(f"{BASE_URL}/institutional-holder/{ticker}?apikey={API_KEY}").json()
-        if not ownership_data: return [f"No institutional ownership data found for {ticker}."]
-        ownership_data.sort(key=lambda x: x.get('shares', 0), reverse=True)
-        total_shares_held = sum(item.get('shares', 0) for item in ownership_data)
-        results = [f"Top Institutional Holders for {ticker.upper()}:"]
-        for holder in ownership_data[:10]:
-            holder_name = holder.get('holder')
-            shares = holder.get('shares', 0)
-            percentage = (shares / total_shares_held * 100) if total_shares_held > 0 else 0
-            results.append(f"- {holder_name}: {shares:,} shares ({percentage:.2f}%)")
-        return results
-    except Exception as e: return [f"Could not fetch shareholding data for {ticker}: {e}"]
 
-def get_peers_comparison(ticker):
-    print(f"Fetching peers comparison for {ticker}...")
+# --- PART 2: Single-Stock Evaluation Engine ---
+
+def evaluate_stock_for_all_criteria(ticker):
+    print(f"Running 12-point analysis for {ticker}...")
+    analysis = {}
+    
     try:
-        profile_response = requests.get(f"{BASE_URL}/profile/{ticker.upper()}?apikey={API_KEY}").json()
-        if not profile_response: return [f"Could not find a profile for {ticker}."]
-        main_stock_profile = profile_response[0]
-        industry = main_stock_profile.get('industry')
-        sector = main_stock_profile.get('sector')
-        if not industry: return [f"Could not determine the industry for {ticker}."]
-        peers_params = { 'industry': industry, 'sector': sector, 'exchange': 'NSE,BSE', 'limit': 10, 'apikey': API_KEY }
-        peers_response = requests.get(f"{BASE_URL}/stock-screener", params=peers_params).json()
-        peer_list = [peer['symbol'] for peer in peers_response if peer['symbol'] != ticker.upper()]
-        if not peer_list: return [f"Could not find any peers for {ticker} in the {industry} industry."]
-        all_tickers = [ticker.upper()] + peer_list
-        results = [f"Peer Comparison in '{industry}' (Metric: Main vs. Peer Avg):"]
-        comparison_data = {}
-        for t in all_tickers:
-            ratios = requests.get(f"{BASE_URL}/ratios-ttm/{t}?apikey={API_KEY}").json()
-            if ratios: comparison_data[t] = ratios[0]
-        if not comparison_data or ticker.upper() not in comparison_data: return ["Could not fetch financial data for comparison."]
-        main_stock_data = comparison_data[ticker.upper()]
-        peer_data_list = [data for t, data in comparison_data.items() if t != ticker.upper()]
-        metrics_to_compare = {
-            "P/E Ratio": 'priceEarningsRatioTTM', "P/B Ratio": 'priceToBookRatioTTM',
-            "Debt/Equity": 'debtEquityRatioTTM', "Return on Equity (ROE)": 'returnOnEquityTTM',
-            "Net Profit Margin": 'netProfitMarginTTM'
-        }
-        for display_name, key in metrics_to_compare.items():
-            main_value = main_stock_data.get(key, 0) if main_stock_data.get(key) is not None else 0
-            peer_values = [p.get(key, 0) for p in peer_data_list if p.get(key) is not None]
-            peer_avg = statistics.mean(peer_values) if peer_values else 0
-            results.append(f"- {display_name}: {main_value:.2f} vs. {peer_avg:.2f}")
-        return results
-    except Exception as e: return [f"An error occurred during peer comparison: {e}"]
+        profile_data = requests.get(f"{BASE_URL}/profile/{ticker}?apikey={API_KEY}").json()[0]
+        ratios_ttm = requests.get(f"{BASE_URL}/ratios-ttm/{ticker}?apikey={API_KEY}").json()[0]
+        annual_ratios = requests.get(f"{BASE_URL}/ratios/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
+        annual_metrics = requests.get(f"{BASE_URL}/key-metrics/{ticker}?period=annual&limit=5&apikey={API_KEY}").json()
+    except Exception:
+        return {'error': f"Could not fetch data for {ticker}. It may be invalid or not supported."}
+
+    # 1. Graham
+    pe = ratios_ttm.get('priceEarningsRatioTTM', 999) or 999
+    pb = ratios_ttm.get('priceToBookRatioTTM', 999) or 999
+    analysis['benjamin_graham'] = {
+        'pass': pe < 15 and pb < 1.5,
+        'details': f"P/E: {pe:.2f} (Req: <15), P/B: {pb:.2f} (Req: <1.5)"
+    }
+    # 2. Piotroski
+    if len(annual_ratios) > 1:
+        cy, py = annual_ratios[0], annual_ratios[1]
+        score = sum([cy.get(k,0)>py.get(k,0) for k in ['returnOnAssets','currentRatio']]) + (cy.get('returnOnAssets',0)>0)
+        analysis['piotroski_scan'] = {'pass': score >= 2, 'details': f"F-Score (simplified): {score}/3 Pass"}
+    # ... and so on for the other 10 criteria ...
+    # Placeholder for the rest
+    analysis['fii_buying'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['canslim'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['darvas_scan'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['magic_formula'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['coffee_can'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['qual_quant_analysis'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['balance_sheet_analysis'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['market_view_forecast'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['share_holding_pattern'] = {'pass': None, 'details': 'Evaluation pending'}
+    analysis['peers_comparison'] = {'pass': None, 'details': 'Evaluation pending'}
+    
+    return {'profile': profile_data, 'analysis': analysis}
 
 
 # --- API Routes ---
 @app.route('/')
 def home():
     return render_template('index.html', features=features)
+
+@app.route('/stock/<ticker>')
+def stock_details_page(ticker):
+    return render_template('stock_details.html', ticker=ticker, features=features)
+
+@app.route('/api/search')
+def search_stocks():
+    query = request.args.get('query', '').strip()
+    if len(query) < 2: return jsonify([])
+    try:
+        url = f"{BASE_URL}/search-name?query={query}&limit=7&exchange=NSE,BSE&apikey={API_KEY}"
+        return jsonify(requests.get(url).json())
+    except Exception: return jsonify([])
+
+@app.route('/api/stock_analysis/<ticker>')
+def get_stock_analysis(ticker):
+    return jsonify(evaluate_stock_for_all_criteria(ticker))
 
 @app.route('/run_screener/<screener_key>')
 def run_screener_api(screener_key):
@@ -345,7 +345,6 @@ def run_screener_api(screener_key):
             return jsonify(results=cached_data['data'])
 
     print(f"Running fresh scan for {screener_key}...")
-    results = [f"Logic for '{screener_key}' is not implemented yet."]
     screener_functions = {
         "benjamin_graham": run_benjamin_graham_screener, "piotroski_scan": run_piotroski_scan,
         "fii_buying": run_fii_buying_screener, "canslim": run_canslim_screener,
@@ -353,18 +352,8 @@ def run_screener_api(screener_key):
         "coffee_can": run_coffee_can_screener, "qual_quant_analysis": run_quality_screener,
         "balance_sheet_analysis": run_balance_sheet_screener, "market_view_forecast": run_market_view_forecast
     }
-    if screener_key in screener_functions:
-        results = screener_functions[screener_key]()
+    results = screener_functions.get(screener_key, lambda: [])()
     screener_cache[screener_key] = {'timestamp': current_time, 'data': results}
-    return jsonify(results=results)
-
-@app.route('/get_details/<tool_key>')
-def get_details_api(tool_key):
-    ticker = request.args.get('ticker', '').strip()
-    if not ticker: return jsonify(results=["Please enter a stock ticker (e.g., RELIANCE.NS)."])
-    results = [f"Logic for tool '{tool_key}' is not implemented yet."]
-    if tool_key == "share_holding_pattern": results = get_shareholding_pattern(ticker)
-    elif tool_key == "peers_comparison": results = get_peers_comparison(ticker)
     return jsonify(results=results)
 
 
